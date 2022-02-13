@@ -1,1 +1,1 @@
-# Kaggle - H%M Recommendations Challenge
+# Kaggle - H&M Recommendations Challenge
