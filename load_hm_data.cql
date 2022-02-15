@@ -52,10 +52,10 @@ MERGE (prodGrp:ProductGroup {name: row.product_group_name})
 MERGE (prod:Product {code: row.article_id})
   ON CREATE SET
     prod.name = row.prod_name,
-    prod.description = prod.detail_desc
+    prod.description = row.detail_desc
 WITH ga, dept, sect, indx, indxGrp, garmGrp, pcv, pcm, cg, prodType, prodGrp, prod
-MERGE (cg)-[:HAS_COLOUR_VALUE]->(pcv)
-MERGE (cg)-[:HAS_MASTER_COLOUR]->(pcm)
+MERGE (prod)-[:HAS_COLOUR_VALUE]->(pcv)
+MERGE (prod)-[:HAS_MASTER_COLOUR]->(pcm)
 MERGE (prod)-[:HAS_COLOUR]->(cg)
 MERGE (prod)-[:SUBSET_OF]->(prodType)
 MERGE (prodType)-[:SUBSET_OF]->(prodGrp)
@@ -66,3 +66,55 @@ MERGE (prod)-[:HAS_INDEX]->(indx)
 MERGE (indx)-[:HAS_GROUP]->(indxGrp)
 MERGE (prod)-[:HAS_GARMENT_GROUP]->(garmGrp);
 
+
+// Loading the customer data 
+CREATE CONSTRAINT uniqueCustomer IF NOT EXISTS FOR (n:Customer) REQUIRE (n.id) IS UNIQUE;
+// CREATE CONSTRAINT uniquePostcode IF NOT EXISTS FOR (n:PostalCode) REQUIRE (n.postal_code) IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 'file:///customers.csv' AS row
+CALL {
+  WITH row
+  MERGE (c:Customer {id: row.customer_id})
+  ON CREATE SET 
+    c.club_member_status =
+      CASE
+        WHEN  row.club_member_status IS NULL THEN 'NOT_ACTIVE'
+        ELSE  row.club_member_status
+      END,
+    c.active =
+      CASE
+        WHEN row.Active IS NULL THEN 0
+        ELSE row.Active
+      END,
+    c.fn = 
+      CASE
+        WHEN row.FN IS NULL THEN 0
+        ELSE row.FN
+      END,
+    c.fashion_news_frequency = 
+      CASE
+        WHEN row.fashion_news_frequency IS NULL THEN 'NONE'
+        ELSE row.fashion_news_frequency
+      END,
+    c.age = 
+      CASE
+         WHEN row.age IS NULL THEN 100
+         ELSE row.age
+      END,
+    c.postal_code = 
+      CASE
+         WHEN row.postal_code IS NULL THEN 'NONE'
+         ELSE row.postal_code
+      END
+
+} IN TRANSACTIONS OF 1000 ROWS;
+
+    
+// Load transaction data
+LOAD CSV WITH HEADERS FROM 'file:///transactions_train.csv' AS row
+CALL {
+  WITH row
+  MATCH (c:Customer {id: row.customer_id})
+  MATCH (p:Product {code: row.article_id})
+  MERGE (c)-[:PURCHASED {t_date: date(row.t_dat), price: row.price, sales_channel: row.sales_channel_id}]->(p)
+} IN TRANSACTIONS OF 1000 ROWS;
