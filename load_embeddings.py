@@ -21,3 +21,5 @@ if __name__=='__main__':
         print(prod_id)
         embedding = img_emb.create_embedding(file)
         neo_emb.add_prod_embedding(prod_id, embedding[0].tolist())
+
+
