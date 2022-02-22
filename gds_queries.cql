@@ -1,33 +1,26 @@
 // GDS Queries
+// Use appropriate database
+:use products;
 
-// Compute some stats on the data first
-// Average number of purchases per user
-MATCH (c:Customer)-[:PURCHASED]->(p:Product)
-WITH c, COUNT(p) AS num_purchases
-WITH AVG(num_purchases) as avg_num_purchases, stDevP(num_purchases) as std_dev
-RETURN avg_num_purchases, std_dev;
-
-// Create a bipartite graph projection
+// Create graph projection with node properties
 CALL gds.graph.create(
-    'user_items_graph',
-    ['Customer', 'Product'],
+    'knnGraph',
     {
-        PURCHASED: {
-            type: 'PURCHASED',
-            orientation: 'NATURAL'
-        },
-        PURCHASED_BY: {
-            type: 'PURCHASED',
-            orientation: 'REVERSE'
+        Product: {
+            label: 'Product',
+            properties:'embedding'
         }
-    }
+    },
+    '*'
 );
 
-CALL gds.nodeSimilarity.mutate(
-    'user_items_graph',
-    {
-        relationshipProjection: 'PURCHASED'
-    }
-)
-YIELD *
-RETURN *
+// Create the top 10 nearest neighbours based on the image embeddings
+CALL gds.beta.knn.write('knnGraph', {
+    writeRelationshipType: 'SIMILAR',
+    writeProperty: 'score',
+    topK: 10,
+    randomSeed: 42,
+    concurrency: 1,
+    nodeWeightProperty: 'embedding'
+})
+YIELD nodesCompared, relationshipsWritten;
